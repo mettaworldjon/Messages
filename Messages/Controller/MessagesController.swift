@@ -21,7 +21,7 @@ class MessagesController: UITableViewController {
         view.backgroundColor = .white
         setupNavBar()
         checkIfUserLoggedIn()
-        observeMessages()
+        observeUserMessages()
         registerCells()
     }
     
@@ -48,6 +48,38 @@ class MessagesController: UITableViewController {
             button.addTarget(self, action: #selector(showChatController), for: .touchUpInside)
             self.navigationItem.titleView = button
         }
+    }
+    
+    fileprivate func handleMesssageData(_ snapshot: (DataSnapshot)) {
+        if let dictionary = snapshot.value as? [String:AnyObject] {
+            // Study
+            let message = Message(dictionary: dictionary)
+            if let toId = message.toId {
+                self.messagesDictionary[toId] = message
+                self.messages = Array(self.messagesDictionary.values)
+                self.messages.sort(by: { (m1, m2) -> Bool in
+                    return m1.timestamp!.int32Value > m2.timestamp!.int32Value
+                })
+            }
+            
+        }
+    }
+    
+    fileprivate func observeUserMessages() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let ref = Database.database().reference().child("user-messages").child(uid)
+        ref.observe(.childAdded) { (snapshot) in
+            let messageKey = snapshot.key
+            let messageRef = Database.database().reference().child("messages").child(messageKey)
+            messageRef.observeSingleEvent(of: .value, with: { (snapshot) in
+                self.handleMesssageData(snapshot)
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                }
+            })
+            
+        }
+        
     }
     
     fileprivate func observeMessages() {
@@ -85,11 +117,13 @@ class MessagesController: UITableViewController {
     }
     
     fileprivate func setupNavWithUser(user:User) {
+        self.messages.removeAll()
+        self.messagesDictionary.removeAll()
         let button = UIButton(type: .system)
         button.setTitle(user.name, for: .normal)
         self.navigationItem.titleView = button
     }
-    
+
     @objc func showChatController(user:User) {
         let layout = UICollectionViewFlowLayout()
         let chatLogController = ChatLogController(collectionViewLayout: layout)

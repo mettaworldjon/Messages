@@ -13,11 +13,17 @@ class UserCell: UITableViewCell {
     
     var messageContent:Message? {
         didSet {
-            if let toId = messageContent?.toId {
-                let ref = Database.database().reference().child("users").child(toId)
+            var chatParterId:String?
+            if messageContent?.fromId == Auth.auth().currentUser?.uid {
+                chatParterId = messageContent?.toId
+            } else {
+                chatParterId = messageContent?.fromId
+            }
+            
+            if let id = chatParterId {
+                let ref = Database.database().reference().child("users").child(id)
                 ref.observeSingleEvent(of: .value) { (DataSnapshot) in
                     if let dictionary = DataSnapshot.value as? [String:AnyObject] {
-                        ///// HERE!!!!!!!
                         self.textLabel?.text = dictionary["name"] as? String
                         self.profileImageView.loadImageUsingCahceWithURLString(dictionary["profileImageURL"] as! String)
                         self.detailTextLabel?.text = self.messageContent?.text
